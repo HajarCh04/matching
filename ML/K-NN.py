@@ -1,56 +1,51 @@
+# Import necessary libraries
 import pandas as pd
-import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 
 # Load the dataset
-data_path = 'C:/Users/USER/Desktop/matching-automatique/ML/data.csv'
-data = pd.read_csv(data_path, encoding='ISO-8859-1')
+file_path = 'C:/Users/USER/Desktop/matching-automatique/ML/data.csv'
+data = pd.read_csv(file_path, encoding='ISO-8859-1')
 
-# Inspect the first few rows of the dataset
-print(data.head())
+# Fill missing values in text columns to avoid issues during vectorization
+data['Description1'].fillna("", inplace=True)
+data['Description2'].fillna("", inplace=True)
 
-# Encoding categorical columns
-label_encoders = {}
-for column in data.select_dtypes(include=['object']).columns:
-    le = LabelEncoder()
-    data[column] = le.fit_transform(data[column])
-    label_encoders[column] = le
+# Combine Description1 and Description2 for text-based features
+data['Combined_Description'] = data['Description1'] + " " + data['Description2']
 
-# Splitting the dataset into features and target
-# Assuming the last column is the target
-X = data.iloc[:, :-1].values  # Features
-y = data.iloc[:, -1].values   # Target
+# Define feature and target variables
+X = data['Combined_Description']  # Combined descriptions as input features
+y = data['Correspondence'].fillna(0).astype(
+    int)  # Correspondence as the target variable
 
-# Splitting the dataset into training and testing sets
+# Vectorize the combined descriptions using TF-IDF
+tfidf_vectorizer = TfidfVectorizer()
+X_tfidf = tfidf_vectorizer.fit_transform(X)
+
+# Split the data into training and testing sets
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42)
+    X_tfidf, y, test_size=0.3, random_state=42)
 
-# Standardizing the features
-scaler = StandardScaler()
-X_train = scaler.fit_transform(X_train)
-X_test = scaler.transform(X_test)
-
-# Applying the k-NN algorithm
-# You can adjust the number of neighbors
+# Initialize and train the K-Nearest Neighbors classifier
 knn = KNeighborsClassifier(n_neighbors=5)
 knn.fit(X_train, y_train)
 
-# Making predictions
+# Predict on the test set
 y_pred = knn.predict(X_test)
 
-# Evaluating the model
+# Calculate quality metrics
 accuracy = accuracy_score(y_test, y_pred)
-precision = precision_score(y_test, y_pred, average='weighted')
-recall = recall_score(y_test, y_pred, average='weighted')
-f1 = f1_score(y_test, y_pred, average='weighted')
+precision = precision_score(y_test, y_pred, zero_division=1)
+recall = recall_score(y_test, y_pred, zero_division=1)
+f1 = f1_score(y_test, y_pred, zero_division=1)
+conf_matrix = confusion_matrix(y_test, y_pred)
 
-print(f'Accuracy: {accuracy}')
-print(f'Precision: {precision}')
-print(f'Recall: {recall}')
-print(f'F1 Score: {f1}')
-
-# Detailed classification report
-print("\nClassification Report:\n", classification_report(y_test, y_pred))
+# Output results
+print("Accuracy:", accuracy)
+print("Precision:", precision)
+print("Recall:", recall)
+print("F1 Score:", f1)
+print("Confusion Matrix:\n", conf_matrix)
